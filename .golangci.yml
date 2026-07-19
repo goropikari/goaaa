@@ -1,0 +1,59 @@
+version: "2"
+
+linters:
+  default: standard
+  enable:
+    - asciicheck
+    - bodyclose
+    - cyclop
+    - dupl
+    - errcheck
+    - gocognit
+    - gocritic
+    - gosec
+    - ineffassign
+    - revive
+    - testifylint
+    - testpackage
+    - usetesting
+    - wsl_v5
+    - importas
+  settings:
+    cyclop:
+      max-complexity: 50
+    gocognit:
+      min-complexity: 80
+    revive:
+      rules:
+        - name: package-comments
+          disabled: true
+        - name: redundant-import-alias
+          disabled: false
+    usetesting:
+      context-background: true
+    importas:
+      no-extra-aliases: true
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+      - "^sample/"
+
+formatters:
+  enable:
+    - gofumpt
+    - goimports
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+      - "^sample/"
