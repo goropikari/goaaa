@@ -31,7 +31,7 @@ func TestAnalyzeFilesAcceptsOrderedAndRepeatedPhases(t *testing.T) {
 		source string
 	}{
 		{
-			name: "ordered markers with repeated arrange phase have no diagnostics",
+			name: "when markers are ordered with a repeated Arrange phase, no diagnostics are reported",
 			source: `package example
 import "testing"
 func TestOK(t *testing.T) {
@@ -59,12 +59,13 @@ func TestOK(t *testing.T) {
 }
 
 func TestAnalyzeFilesReportsOrderAndSubtestIndependently(t *testing.T) {
-	// Arrange
-	path := writeFixture(t, `package example
+	t.Run("when parent and child have different phase orders, only the parent diagnostic is reported", func(t *testing.T) {
+		// Arrange
+		path := writeFixture(t, `package example
 import "testing"
 func TestParent(t *testing.T) {
   // Arrange
-  t.Run("child", func(t *testing.T) {
+	  t.Run("when child Assert precedes Act, the child diagnostic is evaluated independently", func(t *testing.T) {
     // Assert
     // Act
   })
@@ -72,26 +73,29 @@ func TestParent(t *testing.T) {
   // Assert
 }`)
 
-	// Act
-	diagnostics, err := analyzer.AnalyzeFiles([]string{path})
+		// Act
+		diagnostics, err := analyzer.AnalyzeFiles([]string{path})
 
-	// Assert
-	require.NoError(t, err)
-	require.Len(t, diagnostics, 1)
-	assert.Contains(t, diagnostics[0].Message, "Act phase appears after Assert")
+		// Assert
+		require.NoError(t, err)
+		require.Len(t, diagnostics, 1)
+		assert.Contains(t, diagnostics[0].Message, "Act phase appears after Assert")
+	})
 }
 
 func TestWriteSARIF(t *testing.T) {
-	// Arrange
-	var output strings.Builder
+	t.Run("when a diagnostic is provided, SARIF output contains version 2.1.0", func(t *testing.T) {
+		// Arrange
+		var output strings.Builder
 
-	// Act
-	err := analyzer.WriteSARIF(&output, []analyzer.Diagnostic{{File: "x_test.go", Line: 4, Column: 3, Message: "bad order"}})
+		// Act
+		err := analyzer.WriteSARIF(&output, []analyzer.Diagnostic{{File: "x_test.go", Line: 4, Column: 3, Message: "bad order"}})
 
-	// Assert
-	require.NoError(t, err)
+		// Assert
+		require.NoError(t, err)
 
-	var got map[string]any
-	require.NoError(t, json.Unmarshal([]byte(output.String()), &got))
-	assert.Equal(t, "2.1.0", got["version"])
+		var got map[string]any
+		require.NoError(t, json.Unmarshal([]byte(output.String()), &got))
+		assert.Equal(t, "2.1.0", got["version"])
+	})
 }

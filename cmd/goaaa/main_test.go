@@ -30,7 +30,7 @@ func TestExecute(t *testing.T) {
 		wantSARIF  bool
 	}{
 		{
-			name: "ordered markers return success",
+			name: "when markers are ordered, exit code 0 is returned",
 			args: func(path string) []string { return []string{path} },
 			source: `package fixture
 import "testing"
@@ -45,7 +45,7 @@ func TestValue(t *testing.T) {
 			wantCode: 0,
 		},
 		{
-			name: "phase order violation returns failure and text diagnostic",
+			name: "when phase order is invalid, exit code 1 and a text diagnostic are returned",
 			args: func(path string) []string { return []string{path} },
 			source: `package fixture
 import "testing"
@@ -59,7 +59,7 @@ func TestValue(t *testing.T) {
 			wantStderr: "AAA001",
 		},
 		{
-			name: "sarif format writes structured diagnostics to stdout",
+			name: "when SARIF format is requested for invalid phases, exit code 1 and structured stdout are returned",
 			args: func(path string) []string { return []string{"--format", "sarif", path} },
 			source: `package fixture
 import "testing"
@@ -71,7 +71,7 @@ func TestValue(t *testing.T) {
 			wantSARIF: true,
 		},
 		{
-			name:       "missing input returns usage error",
+			name:       "when input is missing, exit code 2 and a usage error are returned",
 			args:       func(string) []string { return nil },
 			wantCode:   2,
 			wantStderr: "requires a file or directory",
@@ -107,46 +107,48 @@ func TestValue(t *testing.T) {
 }
 
 func TestExecuteDiffAnalyzesOnlyChangedGoFiles(t *testing.T) {
-	// Arrange
-	repo := t.TempDir()
-	runGit(t, repo, "init", "-q")
-	require.NoError(t, os.WriteFile(filepath.Join(repo, "clean_test.go"), []byte(`package fixture
+	t.Run("when only one Go file changes, only that file's diagnostic is reported", func(t *testing.T) {
+		// Arrange
+		repo := t.TempDir()
+		runGit(t, repo, "init", "-q")
+		require.NoError(t, os.WriteFile(filepath.Join(repo, "clean_test.go"), []byte(`package fixture
 import "testing"
 func TestClean(t *testing.T) {
   // Arrange
   // Act
   // Assert
 }`), 0o600))
-	badPath := filepath.Join(repo, "bad_test.go")
-	require.NoError(t, os.WriteFile(badPath, []byte(`package fixture
+		badPath := filepath.Join(repo, "bad_test.go")
+		require.NoError(t, os.WriteFile(badPath, []byte(`package fixture
 import "testing"
 func TestBad(t *testing.T) {
   // Arrange
   // Act
   // Assert
 }`), 0o600))
-	runGit(t, repo, "add", "clean_test.go", "bad_test.go")
-	runGit(t, repo, "-c", "user.name=goaaa-test", "-c", "user.email=goaaa@example.com", "commit", "-qm", "baseline")
-	require.NoError(t, os.WriteFile(badPath, []byte(`package fixture
+		runGit(t, repo, "add", "clean_test.go", "bad_test.go")
+		runGit(t, repo, "-c", "user.name=goaaa-test", "-c", "user.email=goaaa@example.com", "commit", "-qm", "baseline")
+		require.NoError(t, os.WriteFile(badPath, []byte(`package fixture
 import "testing"
 func TestBad(t *testing.T) {
   // Assert
   // Act
 }`), 0o600))
 
-	t.Chdir(repo)
+		t.Chdir(repo)
 
-	var stdout, stderr strings.Builder
+		var stdout, stderr strings.Builder
 
-	// Act
-	code := execute([]string{"--diff"}, &stdout, &stderr)
+		// Act
+		code := execute([]string{"--diff"}, &stdout, &stderr)
 
-	// Assert
-	assert.Equal(t, 1, code)
-	assert.Contains(t, stderr.String(), "bad_test.go")
-	assert.Contains(t, stderr.String(), "AAA001")
-	assert.NotContains(t, stderr.String(), "clean_test.go")
-	assert.Empty(t, stdout.String())
+		// Assert
+		assert.Equal(t, 1, code)
+		assert.Contains(t, stderr.String(), "bad_test.go")
+		assert.Contains(t, stderr.String(), "AAA001")
+		assert.NotContains(t, stderr.String(), "clean_test.go")
+		assert.Empty(t, stdout.String())
+	})
 }
 
 func runGit(t *testing.T, dir string, args ...string) {
