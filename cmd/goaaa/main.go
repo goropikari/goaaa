@@ -29,7 +29,7 @@ func execute(args []string, stdout, stderr io.Writer) int {
 	)
 
 	root := &cobra.Command{
-	Use:   "goaaa [flags] <file|directory> [... ]",
+		Use:   "goaaa [flags] <file|directory> [... ]",
 		Short: "Check Go tests for Arrange–Act–Assert marker order",
 		Args: func(cmd *cobra.Command, positional []string) error {
 			if !diffOnly && len(positional) == 0 {
