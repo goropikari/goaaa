@@ -126,7 +126,7 @@ func TestBad(t *testing.T) {
   // Assert
 }`), 0o600))
 	runGit(t, repo, "add", "clean_test.go", "bad_test.go")
-	runGit(t, repo, "-c", "user.name=aaago-test", "-c", "user.email=aaago@example.com", "commit", "-qm", "baseline")
+	runGit(t, repo, "-c", "user.name=goaaa-test", "-c", "user.email=goaaa@example.com", "commit", "-qm", "baseline")
 	require.NoError(t, os.WriteFile(badPath, []byte(`package fixture
 import "testing"
 func TestBad(t *testing.T) {
