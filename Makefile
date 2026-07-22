@@ -4,5 +4,5 @@ fmt:
 	dprint fmt
 	golangci-lint run --fix
 
-lint:
+lint: fmt
 	golangci-lint run
