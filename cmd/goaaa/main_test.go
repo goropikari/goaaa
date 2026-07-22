@@ -140,7 +140,7 @@ func TestBad(t *testing.T) {
 		var stdout, stderr strings.Builder
 
 		// Act
-		code := execute([]string{"--diff"}, &stdout, &stderr)
+		code := execute([]string{"diff"}, &stdout, &stderr)
 
 		// Assert
 		assert.Equal(t, 1, code)
@@ -186,11 +186,12 @@ func TestCollectFilesDiff(t *testing.T) {
 			if tt.args[0] == "main..HEAD" {
 				runGit(t, repo, "add", "range_test.go")
 				runGit(t, repo, "-c", "user.name=goaaa-test", "-c", "user.email=goaaa@example.com", "commit", "-qm", "range change")
+
 				args = []string{"HEAD~1..HEAD"}
 			}
 
 			// Act
-			got, err := collectFiles(args, true)
+			got, err := collectDiffFiles(args)
 
 			// Assert
 			require.NoError(t, err)

@@ -23,17 +23,14 @@ type exitCode int
 func (e exitCode) Error() string { return "" }
 
 func execute(args []string, stdout, stderr io.Writer) int {
-	var (
-		format   string
-		diffOnly bool
-	)
+	var format string
 
 	root := &cobra.Command{
 		Use:   "goaaa [flags] <file|directory> [... ]",
 		Short: "Check Go tests for Arrange–Act–Assert marker order",
 		Args: func(cmd *cobra.Command, positional []string) error {
-			if !diffOnly && len(positional) == 0 {
-				return fmt.Errorf("requires a file or directory, unless --diff is used")
+			if len(positional) == 0 {
+				return fmt.Errorf("requires a file or directory, unless the diff subcommand is used")
 			}
 
 			return nil
@@ -41,39 +38,16 @@ func execute(args []string, stdout, stderr io.Writer) int {
 		SilenceErrors: true,
 		SilenceUsage:  true,
 		RunE: func(cmd *cobra.Command, positional []string) error {
-			if format != "text" && format != "sarif" {
-				return fmt.Errorf("unsupported format %q (use text or sarif)", format)
-			}
-
-			files, err := collectFiles(positional, diffOnly)
+			files, err := analyzer.CollectGoFiles(positional)
 			if err != nil {
 				return err
 			}
 
-			diagnostics, err := analyzer.AnalyzeFiles(files)
-			if err != nil {
-				return err
-			}
-
-			if format == "sarif" {
-				if err := analyzer.WriteSARIF(stdout, diagnostics); err != nil {
-					return err
-				}
-			} else {
-				for _, diagnostic := range diagnostics {
-					fmt.Fprintln(stderr, diagnostic.Text())
-				}
-			}
-
-			if len(diagnostics) > 0 {
-				return exitCode(1)
-			}
-
-			return nil
+			return analyze(files, format, stdout, stderr)
 		},
 	}
-	root.Flags().StringVar(&format, "format", "text", "output format: text or sarif")
-	root.Flags().BoolVar(&diffOnly, "diff", false, "analyze only changed Go files from git diff")
+	root.PersistentFlags().StringVar(&format, "format", "text", "output format: text or sarif")
+	root.AddCommand(newDiffCommand(&format, stdout, stderr))
 	root.SetArgs(args)
 
 	if err := root.Execute(); err != nil {
@@ -90,11 +64,50 @@ func execute(args []string, stdout, stderr io.Writer) int {
 	return 0
 }
 
-func collectFiles(positional []string, diffOnly bool) ([]string, error) {
-	if !diffOnly {
-		return analyzer.CollectGoFiles(positional)
+func newDiffCommand(format *string, stdout, stderr io.Writer) *cobra.Command {
+	return &cobra.Command{
+		Use:   "diff [<range>] [--] [<path>...]",
+		Short: "Analyze Go files changed by git diff",
+		Args:  cobra.ArbitraryArgs,
+		RunE: func(cmd *cobra.Command, positional []string) error {
+			files, err := collectDiffFiles(positional)
+			if err != nil {
+				return err
+			}
+
+			return analyze(files, *format, stdout, stderr)
+		},
+	}
+}
+
+func analyze(files []string, format string, stdout, stderr io.Writer) error {
+	if format != "text" && format != "sarif" {
+		return fmt.Errorf("unsupported format %q (use text or sarif)", format)
 	}
 
+	diagnostics, err := analyzer.AnalyzeFiles(files)
+	if err != nil {
+		return err
+	}
+
+	if format == "sarif" {
+		if err := analyzer.WriteSARIF(stdout, diagnostics); err != nil {
+			return err
+		}
+	} else {
+		for _, diagnostic := range diagnostics {
+			fmt.Fprintln(stderr, diagnostic.Text())
+		}
+	}
+
+	if len(diagnostics) > 0 {
+		return exitCode(1)
+	}
+
+	return nil
+}
+
+func collectDiffFiles(positional []string) ([]string, error) {
 	var gitArgs []string
 	if len(positional) > 0 && strings.Contains(positional[0], "..") {
 		gitArgs = append(gitArgs, positional[0])
@@ -105,6 +118,7 @@ func collectFiles(positional []string, diffOnly bool) ([]string, error) {
 	gitArgs = append(gitArgs, positional...)
 	args := []string{"diff", "--name-only", "--diff-filter=ACMR", "-z"}
 	args = append(args, gitArgs...)
+
 	output, err := exec.Command("git", args...).Output()
 	if err != nil {
 		return nil, fmt.Errorf("git diff: %w", err)
