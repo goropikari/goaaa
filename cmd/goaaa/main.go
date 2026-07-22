@@ -95,7 +95,17 @@ func collectFiles(positional []string, diffOnly bool) ([]string, error) {
 		return analyzer.CollectGoFiles(positional)
 	}
 
-	output, err := exec.Command("git", "diff", "--name-only", "--diff-filter=ACMR", "-z").Output()
+	var gitArgs []string
+	if len(positional) > 0 && strings.Contains(positional[0], "..") {
+		gitArgs = append(gitArgs, positional[0])
+		positional = positional[1:]
+	}
+
+	gitArgs = append(gitArgs, "--")
+	gitArgs = append(gitArgs, positional...)
+	args := []string{"diff", "--name-only", "--diff-filter=ACMR", "-z"}
+	args = append(args, gitArgs...)
+	output, err := exec.Command("git", args...).Output()
 	if err != nil {
 		return nil, fmt.Errorf("git diff: %w", err)
 	}

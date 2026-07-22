@@ -151,6 +151,54 @@ func TestBad(t *testing.T) {
 	})
 }
 
+func TestCollectFilesDiff(t *testing.T) {
+	tests := []struct {
+		name     string
+		args     []string
+		wantPath string
+	}{
+		{
+			name:     "when a range is specified, files changed in the range are returned",
+			args:     []string{"main..HEAD"},
+			wantPath: "range_test.go",
+		},
+		{
+			name:     "when a path is specified, only files changed at that path are returned",
+			args:     []string{"selected_test.go"},
+			wantPath: "selected_test.go",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Arrange
+			repo := t.TempDir()
+			runGit(t, repo, "init", "-q")
+			require.NoError(t, os.WriteFile(filepath.Join(repo, "range_test.go"), []byte("package fixture\n"), 0o600))
+			require.NoError(t, os.WriteFile(filepath.Join(repo, "selected_test.go"), []byte("package fixture\n"), 0o600))
+			runGit(t, repo, "add", ".")
+			runGit(t, repo, "-c", "user.name=goaaa-test", "-c", "user.email=goaaa@example.com", "commit", "-qm", "baseline")
+			require.NoError(t, os.WriteFile(filepath.Join(repo, "range_test.go"), []byte("package fixture\n\n// changed\n"), 0o600))
+			require.NoError(t, os.WriteFile(filepath.Join(repo, "selected_test.go"), []byte("package fixture\n\n// changed\n"), 0o600))
+			t.Chdir(repo)
+
+			args := tt.args
+			if tt.args[0] == "main..HEAD" {
+				runGit(t, repo, "add", "range_test.go")
+				runGit(t, repo, "-c", "user.name=goaaa-test", "-c", "user.email=goaaa@example.com", "commit", "-qm", "range change")
+				args = []string{"HEAD~1..HEAD"}
+			}
+
+			// Act
+			got, err := collectFiles(args, true)
+
+			// Assert
+			require.NoError(t, err)
+			assert.Equal(t, []string{tt.wantPath}, got)
+		})
+	}
+}
+
 func runGit(t *testing.T, dir string, args ...string) {
 	t.Helper()
 

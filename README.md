@@ -17,11 +17,16 @@ goaaa ./path/to/example_test.go
 goaaa ./path/to/package
 ```
 
-変更された Go ファイルだけを検査する場合は `--diff` を使います。これは作業ツリーに対する `git diff` の変更ファイルを対象にします。
+変更された Go ファイルだけを検査する場合は `--diff` を使います。引数は通常の `git diff` と同じように、range とパスを指定できます。
 
 ```bash
 goaaa --diff
+goaaa --diff main..HEAD
+goaaa --diff main..HEAD -- path/to/example_test.go
+goaaa --diff -- path/to/example_test.go
 ```
+
+range を指定しない場合は作業ツリーの変更、range を指定した場合はその range の変更が対象です。パスを指定すると対象をそのパスに絞り込みます。
 
 SARIF 形式で出力することもできます。
 
